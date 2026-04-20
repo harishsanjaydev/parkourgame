@@ -1,4 +1,4 @@
-﻿/*
+﻿﻿/*
 MIT License
 
 Copyright (c) 2023 Èric Canela
@@ -44,6 +44,7 @@ namespace Climbing
         Vault_Down = 1 << 6,
         // ADD to the VaultActions enum:
         Wall_Run = 1 << 7,
+        Platform_Leap = 1 << 8,
     }
 
     public class VaultingController : MonoBehaviour
@@ -99,6 +100,10 @@ namespace Climbing
             if (vaultActions.HasFlag(VaultActions.Wall_Run))
             {
             Add(new WallRun(controller));
+            }
+            if (vaultActions.HasFlag(VaultActions.Platform_Leap))
+            {
+                Add(new Platformleap(controller));
             }
         }
 

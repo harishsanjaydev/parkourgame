@@ -55,6 +55,7 @@
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Vaulting Actions/VaultAction.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Climbing/Point.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Action Base Scripts/ActionVaultReach.cs" />
+    <Compile Include="Assets/Dynamic Parkour System/Scripts/Vaulting Actions/PlatformLeap.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Action Base Scripts/Action.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/DetectionCharacterController.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Camera/SwitchCameras.cs" />
@@ -69,7 +70,7 @@
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/JumpPredictionController.cs" />
     <Compile Include="Assets/TutorialInfo/Scripts/Readme.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/ClimbController.cs" />
-    <Compile Include="Assets/Dynamic Parkour System/Scripts/Vaulting Actions/NewMonoBehaviourScript.cs" />
+    <Compile Include="Assets/New Folder/NewMonoBehaviourScript.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Player/PlayerControls.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Climbing/HandlePointConnection.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Vaulting Actions/VaultOver.cs" />
