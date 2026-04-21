@@ -168,12 +168,9 @@ namespace Climbing
 
         public void ToggleRun()
         {
-            if (characterMovement.GetState() != MovementState.Running)
-            {
-                characterMovement.SetCurrentState(MovementState.Running);
-                characterMovement.curSpeed = characterMovement.RunSpeed;
-                characterAnimation.animator.SetBool("Run", true);
-            }
+            characterMovement.SetCurrentState(MovementState.Running);
+            characterMovement.curSpeed = characterMovement.RunSpeed;
+            characterAnimation.animator.SetBool("Run", true);
         }
         public void ToggleWalk()
         {

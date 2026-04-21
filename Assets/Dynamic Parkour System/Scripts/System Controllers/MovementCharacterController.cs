@@ -81,6 +81,9 @@ namespace Climbing
             controller = GetComponent<ThirdPersonController>();
             rb = GetComponent<Rigidbody>();
             anim = controller.characterAnimation.animator;
+            // Prevent tunneling through walls at high speed
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+
             SetCurrentState(MovementState.Walking);
         }
 
@@ -470,4 +473,4 @@ namespace Climbing
         #endregion 
     }
 
-}   
+}

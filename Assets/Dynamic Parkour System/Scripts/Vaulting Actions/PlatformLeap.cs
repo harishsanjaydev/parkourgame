@@ -1,98 +1,95 @@
 /*
- * PlatformLeap.cs
- * Drop into your Climbing namespace alongside your other VaultAction scripts.
+ * PlatformLeap.cs  — Obstacle Clear Leap
+ *
+ * Trigger: running + jump pressed + obstacle wall detected ahead
+ * Behaviour: player launches a high arc over the obstacle, lands on far side
  *
  * SETUP:
- *  1. Add  Platform_Leap = 1 << 8  to the VaultActions enum in VaultingController.cs
- *  2. In VaultingController.Start() add:
+ *  1. VaultActions enum:  Platform_Leap = 1 << 8
+ *  2. VaultingController.Start():
  *       if (vaultActions.HasFlag(VaultActions.Platform_Leap))
  *           Add(new PlatformLeap(controller));
- *  3. In the Inspector, tick Platform_Leap on your VaultingController.
- *  4. Make sure your platforms/ground have a layer assigned and set leapLayers below.
- *  5. Add animator states:
- *       "Leap Start"   – run-to-jump takeoff  (can reuse PredictedJump)
- *       "Leap Airtime" – long hang / tuck     (looping)
- *       "Leap Land"    – smooth landing        (can reuse Land)
+ *  3. Tick Platform_Leap in Inspector on VaultingController
+ *  4. Optionally tag obstacle objects with "Obstacle" and set obstacleTag below
+ *
+ * ANIMATOR STATES NEEDED:
+ *  "Leap Start"   – takeoff
+ *  "Leap Airtime" – looping hang in air
+ *  "Leap Land"    – landing recovery
  */
 
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace Climbing
 {
-    public class Platformleap : VaultAction
+    public class PlatformLeap : VaultAction
     {
-        // ── Tuning ──────────────────────────────────────────────────────────
-        [Header("Detection")]
-        private float detectionRange    = 50f;   // max horizontal distance to scan
-        private float minHeightGain     = 0.5f;  // platform must be at least this much higher
-        private float maxHeightGain     = 6f;    // won't try to leap to something too tall
-        private float arcHeight         = 4.5f;  // parabola peak above the midpoint
-        private float leapDuration      = 0.85f; // seconds to travel the arc (tune with anim)
-        private float landMomentumKeep  = 0.75f; // fraction of run speed kept on landing (0-1)
+        // ── Detection ────────────────────────────────────────────────────────
+        private float  obstacleCheckDist = 3.0f;  // how far ahead to detect a wall
+        private float  obstacleMinHeight = 0.5f;  // ignore bumps shorter than this
+        private float  obstacleMaxHeight = 4.0f;  // won't leap over walls taller than this
+        private string obstacleTag       = "";    // optional: only leap over tagged objects
 
-        // Layer that counts as "platform surface" — set to match your ground/environment layer
-        private LayerMask leapLayers;
+        // ── Arc ──────────────────────────────────────────────────────────────
+        private float arcHeight           = 3.5f;  // peak height of jump arc
+        private float leapDuration        = 0.9f;  // total air time in seconds
+        private float landMomentumKeep    = 0.85f; // speed kept on landing (0-1)
+        private float leapForwardDistance = 8f;    // extra forward distance BEYOND the obstacle
 
-        // ── State ────────────────────────────────────────────────────────────
-        private float   travelT     = 0f;   // 0→1 progress along arc
-        private Vector3 leapOrigin;
-        private Vector3 leapTarget;
+        // ── Layers ───────────────────────────────────────────────────────────
+        private LayerMask geometryLayers;
+
+        // ── Runtime state ─────────────────────────────────────────────────────
+        private float      travelT = 0f;
+        private Vector3    leapOrigin;
+        private Vector3    leapTarget;
         private Quaternion leapStartRot;
         private Quaternion leapTargetRot;
-        private bool    landing     = false;
-        private float   landTimer   = 0f;
-        private const float LAND_RECOVER = 0.25f; // seconds of landing recovery
+        private bool       landing  = false;
+        private float      landTimer = 0f;
+        private const float LAND_RECOVER = 0.22f;
 
-        // ── Constructor ──────────────────────────────────────────────────────
-        public Platformleap(ThirdPersonController _controller) : base(_controller)
+        public PlatformLeap(ThirdPersonController _controller) : base(_controller)
         {
-            // Grab every non-ignore layer as the leap surface by default.
-            // Prefer to set this explicitly to your ground/environment layer.
-            leapLayers = ~0;
+            geometryLayers = ~0; // all layers — narrow to your environment layer if needed
         }
 
-        // ── CheckAction — called every frame by VaultingController ───────────
+        // ─────────────────────────────────────────────────────────────────────
         public override bool CheckAction()
         {
-            // Gate: grounded, running, jump pressed, not already doing something
-            if (controller.isVaulting)         return false;
-            if (!controller.isGrounded)        return false;
-            if (controller.dummy)              return false;
-            if (!controller.characterInput.jump) return false;
-            if (controller.characterInput.movement == Vector2.zero) return false;
+            if (controller.isVaulting)                                           return false;
+            if (!controller.isGrounded)                                          return false;
+            if (controller.dummy)                                                return false;
+            if (!controller.characterInput.jump)                                 return false;
             if (controller.characterMovement.GetState() != MovementState.Running) return false;
+            if (controller.characterInput.movement == Vector2.zero)              return false;
 
-            // Find a valid platform ahead
-            Vector3 landingSpot = Vector3.zero;
-            if (!FindPlatform(out landingSpot))
-                return false;
+            Vector3 landingSpot;
+            if (!FindObstacleAndLanding(out landingSpot)) return false;
 
-            // Set up the leap
+            // Setup
             leapOrigin    = controller.transform.position;
             leapTarget    = landingSpot;
             leapStartRot  = controller.transform.rotation;
-            leapTargetRot = Quaternion.LookRotation((leapTarget - leapOrigin).WithY(0).normalized);
-            travelT       = 0f;
-            landing       = false;
-            landTimer     = 0f;
+            leapTargetRot = Quaternion.LookRotation(
+                new Vector3(leapTarget.x - leapOrigin.x, 0f, leapTarget.z - leapOrigin.z).normalized);
 
-            // Hand off control
+            travelT   = 0f;
+            landing   = false;
+            landTimer = 0f;
+
             controller.DisableController();
-
-            // Animations — replace state names with whatever you have in your Animator
-            animator.animator.CrossFade("Leap Start",   0.15f);
-
+            animator.animator.SetBool("Leap Airtime", true);
+            animator.animator.CrossFade("Leap Start", 0.15f);
             return true;
         }
 
-        // ── Update — runs while isVaulting == true ────────────────────────────
+        // ─────────────────────────────────────────────────────────────────────
         public override bool Update()
         {
             if (!controller.isVaulting) return false;
 
-            // ── Landing recovery phase ───────────────────────────────────────
+            // Landing recovery phase
             if (landing)
             {
                 landTimer += Time.deltaTime;
@@ -104,123 +101,122 @@ namespace Climbing
                 return true;
             }
 
-            // ── Arc travel ──────────────────────────────────────────────────
+            // Arc travel
             travelT += Time.deltaTime / leapDuration;
             travelT  = Mathf.Clamp01(travelT);
 
-            // Move along parabola
             controller.transform.position = SampleParabola(leapOrigin, leapTarget, arcHeight, travelT);
-
-            // Rotate toward target
             controller.transform.rotation = Quaternion.Slerp(leapStartRot, leapTargetRot, travelT * 3f);
 
-            // Swap to airtime anim once we're past takeoff
-            if (travelT > 0.15f && travelT < 0.85f)
-                animator.animator.SetBool("Leap Airtime", true);
+            // Swap to airtime loop mid-arc
+            if (travelT > 0.18f && travelT < 0.82f)
+                animator.animator.CrossFade("Leap Airtime", 0.2f);
 
-            // Trigger landing phase
+            // Begin landing
             if (travelT >= 1f)
             {
-                landing = true;
+                landing   = true;
                 landTimer = 0f;
-                animator.animator.SetBool("Leap Airtime", false);
 
-                // Snap to exact landing spot
                 controller.transform.position = leapTarget;
-
-                // Re-enable physics so momentum carries through
                 controller.characterMovement.SetKinematic(false);
 
-                // Keep horizontal momentum — feels fast, not dead-stop
-                Vector3 forwardMomentum = controller.transform.forward
-                                        * controller.characterMovement.RunSpeed
-                                        * landMomentumKeep;
-                controller.characterMovement.rb.linearVelocity =
-                    new Vector3(forwardMomentum.x, -1f, forwardMomentum.z);
+                animator.animator.SetBool("Leap Airtime", false);
+                animator.animator.CrossFade("Leap Land", 0.15f);
+
+                // Carry run momentum through landing
+                Vector3 fwd = controller.transform.forward
+                            * controller.characterMovement.RunSpeed
+                            * landMomentumKeep;
+                controller.characterMovement.rb.linearVelocity = new Vector3(fwd.x, -1f, fwd.z);
             }
 
             return true;
         }
 
-        // ── FixedUpdate — keep rigidbody in sync during arc ──────────────────
+        // ─────────────────────────────────────────────────────────────────────
         public override bool FixedUpdate()
         {
             if (!controller.isVaulting) return false;
-            if (landing)                return true;
-
-            // Mirror transform position into rigidbody (kinematic during arc)
+            if (landing) return true;
             controller.characterMovement.rb.position = controller.transform.position;
-
             return true;
         }
 
-        // ── Helpers ──────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Casts forward to find a higher platform within range.
-        /// Returns true and sets landingSpot if valid target found.
-        /// </summary>
-        bool FindPlatform(out Vector3 landingSpot)
+        // ─────────────────────────────────────────────────────────────────────
+        bool FindObstacleAndLanding(out Vector3 landingSpot)
         {
             landingSpot = Vector3.zero;
 
-            Vector3 playerPos  = controller.transform.position;
-            Vector3 forward    = controller.transform.forward;
+            Vector3 pos     = controller.transform.position;
+            Vector3 forward = controller.transform.forward;
 
-            // Sphere-scan forward along the ground plane at several distances
-            int   steps     = 12;
-            float stepSize  = detectionRange / steps;
+            // 1. Detect wall at knee height
+            RaycastHit wallHit;
+            Vector3 kneeOrigin = pos + Vector3.up * 0.6f;
+            if (!Physics.Raycast(kneeOrigin, forward, out wallHit, obstacleCheckDist, geometryLayers))
+                return false;
 
-            for (int i = 2; i <= steps; i++)   // start at step 2 to skip feet
+            if (obstacleTag != "" && wallHit.transform.tag != obstacleTag)
+                return false;
+
+            // 2. Measure obstacle height by probing upward until clear
+            float obstacleHeight = 0f;
+            for (float h = 0.3f; h <= obstacleMaxHeight + 0.5f; h += 0.15f)
             {
-                float   dist   = stepSize * i;
-                Vector3 probe  = playerPos + forward * dist + Vector3.up * maxHeightGain;
-
-                RaycastHit hit;
-                // Cast downward from above to find a surface
-                if (Physics.Raycast(probe, Vector3.down, out hit, maxHeightGain * 2f, leapLayers))
+                if (!Physics.Raycast(pos + Vector3.up * h, forward, obstacleCheckDist * 1.5f, geometryLayers))
                 {
-                    float heightDiff = hit.point.y - playerPos.y;
-
-                    if (heightDiff < minHeightGain) continue;  // not high enough
-                    if (heightDiff > maxHeightGain) continue;  // too high
-
-                    // Make sure there's nothing blocking the path at chest height
-                    Vector3 chestOrigin = playerPos + Vector3.up * 1.2f;
-                    if (Physics.Raycast(chestOrigin, forward, dist * 0.5f, leapLayers))
-                        continue; // wall in the way
-
-                    landingSpot = hit.point;
-                    return true;
+                    obstacleHeight = h;
+                    break;
                 }
             }
 
-            return false;
+            if (obstacleHeight < obstacleMinHeight) return false;
+            if (obstacleHeight > obstacleMaxHeight) return false;
+
+            // 3. Estimate obstacle depth (how wide it is)
+            float obstacleDepth = 3.0f;
+            RaycastHit depthHit;
+            Vector3 clearOrigin = pos + Vector3.up * (obstacleHeight + 0.3f);
+            if (Physics.Raycast(clearOrigin, forward, out depthHit, 8f, geometryLayers))
+                obstacleDepth = depthHit.distance;
+
+            // 4. Cast down to find landing surface on far side
+            // landDist = obstacle front + obstacle width + big forward leap distance
+            float   landDist  = wallHit.distance + obstacleDepth + leapForwardDistance;
+            Vector3 landProbe = pos + forward * landDist + Vector3.up * 5f;
+
+            RaycastHit groundHit;
+            if (Physics.Raycast(landProbe, Vector3.down, out groundHit, 10f, geometryLayers))
+            {
+                landingSpot = groundHit.point;
+                return true;
+            }
+
+            // Fallback landing at same height
+            landingSpot   = pos + forward * landDist;
+            landingSpot.y = pos.y;
+            return true;
         }
 
+        // ─────────────────────────────────────────────────────────────────────
         void FinishLeap()
         {
             controller.characterMovement.EnableFeetIK();
             controller.characterMovement.stopMotion = false;
-            controller.dummy        = false;
-            controller.allowMovement = true;
-            // Don't call EnableController() — we already re-enabled physics above
-            // just need to restore the state flags
-            controller.isVaulting = false;
-            controller.isJumping  = false;
             controller.characterMovement.SetKinematic(false);
-
-            // Resume running immediately
+            controller.dummy         = false;
+            controller.allowMovement = true;
+            controller.isVaulting    = false;
+            controller.isJumping     = false;
             controller.ToggleRun();
         }
 
-        /// <summary>Parabola sample — same formula as JumpPredictionController.</summary>
         Vector3 SampleParabola(Vector3 start, Vector3 end, float height, float t)
         {
-            float   parabolicT  = t * 2f - 1f;
-            Vector3 travel      = end - start;
-            Vector3 result      = start + t * travel;
-            result.y           += (-parabolicT * parabolicT + 1f) * height;
+            float   pt     = t * 2f - 1f;
+            Vector3 result = start + t * (end - start);
+            result.y      += (-pt * pt + 1f) * height;
             return result;
         }
 
@@ -229,7 +225,6 @@ namespace Climbing
             if (leapTarget == Vector3.zero) return;
             Gizmos.color = Color.cyan;
             Gizmos.DrawSphere(leapTarget, 0.12f);
-
             Vector3 last = leapOrigin;
             for (int i = 1; i <= 20; i++)
             {
@@ -238,11 +233,5 @@ namespace Climbing
                 last = p;
             }
         }
-    }
-
-    // Small extension so .WithY() reads cleanly
-    internal static class Vec3Ext
-    {
-        public static Vector3 WithY(this Vector3 v, float y) => new Vector3(v.x, y, v.z);
     }
 }

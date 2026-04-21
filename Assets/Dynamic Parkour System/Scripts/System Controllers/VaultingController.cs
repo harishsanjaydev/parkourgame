@@ -103,7 +103,7 @@ namespace Climbing
             }
             if (vaultActions.HasFlag(VaultActions.Platform_Leap))
             {
-                Add(new Platformleap(controller));
+                Add(new PlatformLeap(controller));
             }
         }
 

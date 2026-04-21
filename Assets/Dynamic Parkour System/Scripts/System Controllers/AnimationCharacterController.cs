@@ -31,8 +31,10 @@ namespace Climbing
 {
     [RequireComponent(typeof(ThirdPersonController))]
     [RequireComponent(typeof(Animator))]
+    
     public class AnimationCharacterController : MonoBehaviour
     {
+        private bool _lastRootMotion = false;
         private ThirdPersonController controller;
         private Vector3 animVelocity;
 
@@ -51,17 +53,19 @@ namespace Climbing
 
         void Update()
         {
-            animator.SetFloat("Velocity", animVelocity.magnitude);
+    // Velocity smoothing (from fix 1)
+            float targetVelocity = animVelocity.magnitude;
+            float currentVelocity = animator.GetFloat("Velocity");
+            float smoothRate = targetVelocity > currentVelocity ? 10f : 6f;
+            animator.SetFloat("Velocity", Mathf.Lerp(currentVelocity, targetVelocity, Time.deltaTime * smoothRate));
 
             animState = animator.GetCurrentAnimatorStateInfo(0);
 
-            if (animState.IsTag("Root") || animState.IsTag("Drop"))
+            bool shouldUseRootMotion = animState.IsTag("Root") || animState.IsTag("Drop");
+            if (shouldUseRootMotion != _lastRootMotion)              // only set when changed
             {
-                animator.applyRootMotion = true;
-            }
-            else
-            {
-                animator.applyRootMotion = false;
+            animator.applyRootMotion = shouldUseRootMotion;
+            _lastRootMotion = shouldUseRootMotion;
             }
         }
 
@@ -89,9 +93,9 @@ namespace Climbing
         public void HangLedge(ClimbController.ClimbState state)
         {
             if (state == ClimbController.ClimbState.BHanging)
-                animator.CrossFade("Idle To Braced Hang", 0.2f);
+                animator.CrossFade("Idle To Braced Hang", 0.15f);
             else if (state == ClimbController.ClimbState.FHanging)
-                animator.CrossFade("Idle To Freehang", 0.2f);
+                animator.CrossFade("Idle To Freehang", 0.15f);
 
             animator.SetBool("Land", false);
             animator.SetInteger("Climb State", (int)state);
@@ -106,7 +110,7 @@ namespace Climbing
                     direction.x == -1 && direction.y == 1 ||
                     direction.x == -1 && direction.y == -1)
                 {
-                    animator.CrossFade("Braced Hang Hop Left", 0.2f);
+                    animator.CrossFade("Braced Hang Hop Left", 0.15f);
                     startTime = 0.2f;
                     endTime = 0.49f;
                 }
@@ -114,20 +118,20 @@ namespace Climbing
                         direction.x == 1 && direction.y == -1 ||
                         direction.x == 1 && direction.y == 1)
                 {
-                    animator.CrossFade("Braced Hang Hop Right", 0.2f);
+                    animator.CrossFade("Braced Hang Hop Right", 0.15f);
                     startTime = 0.2f;
                     endTime = 0.49f;
                 }
                 else if (direction.x == 0 && direction.y == 1)
                 {
-                    animator.CrossFade("Braced Hang Hop Up", 0.2f);
+                    animator.CrossFade("Braced Hang Hop Up", 0.15f);
                     startTime = 0.3f;
                     endTime = 0.48f;
                 }
                 else if (direction.x == 0 && direction.y == -1)
                 {
 
-                    animator.CrossFade("Braced Hang Hop Down", 0.2f);
+                    animator.CrossFade("Braced Hang Hop Down", 0.15f);
                     startTime = 0.3f;
                     endTime = 0.7f;
                 }
@@ -138,11 +142,11 @@ namespace Climbing
         }
         public void BracedClimb()
         {
-            animator.CrossFade("Braced Hang To Crouch", 0.2f);
+            animator.CrossFade("Braced Hang To Crouch", 0.1f);
         }
         public void FreeClimb()
         {
-            animator.CrossFade("Freehang Climb", 0.2f);
+            animator.CrossFade("Freehang Climb", 0.1f);
         }
         public void DropToFree(int state)
         {

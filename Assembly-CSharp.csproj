@@ -64,13 +64,13 @@
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/VaultingController.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/ThirdPersonController.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/AnimationCharacterController.cs" />
+    <Compile Include="Assets/Dynamic Parkour System/Scripts/NewMonoBehaviourScript.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Climbing/HandlePoints.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/CameraController.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Vaulting Actions/VaultSlide.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/JumpPredictionController.cs" />
     <Compile Include="Assets/TutorialInfo/Scripts/Readme.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/System Controllers/ClimbController.cs" />
-    <Compile Include="Assets/New Folder/NewMonoBehaviourScript.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Player/PlayerControls.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Climbing/HandlePointConnection.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Vaulting Actions/VaultOver.cs" />
@@ -80,6 +80,7 @@
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Action Base Scripts/ActionVaultObstacle.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Vaulting Actions/VaultClimbLedge.cs" />
     <Compile Include="Assets/Dynamic Parkour System/Scripts/Helpers/Climbing/DrawLine.cs" />
+    <Compile Include="Assets/Dynamic Parkour System/Scripts/SpeedStreakEffect.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">
